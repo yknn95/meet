@@ -5,6 +5,7 @@ import { DebugMode } from '@/lib/Debug';
 import { RecordingIndicator } from '@/lib/RecordingIndicator';
 import { SettingsMenu } from '@/lib/SettingsMenu';
 import { ConnectionDetails } from '@/lib/types';
+import styles from '@/styles/Home.module.css';
 import {
   formatChatMessageLinks,
   LiveKitRoom,
@@ -33,17 +34,19 @@ export function PageClientImpl(props: {
   region?: string;
   hq: boolean;
   codec: VideoCodec;
+  username?: string;
+  hideButtons?: boolean;
 }) {
   const [preJoinChoices, setPreJoinChoices] = React.useState<LocalUserChoices | undefined>(
     undefined,
   );
   const preJoinDefaults = React.useMemo(() => {
     return {
-      username: '',
-      videoEnabled: true,
-      audioEnabled: true,
+      username: props.username || '',
+      videoEnabled: false,
+      audioEnabled: false,
     };
-  }, []);
+  }, [props.username]);
   const [connectionDetails, setConnectionDetails] = React.useState<ConnectionDetails | undefined>(
     undefined,
   );
@@ -77,6 +80,7 @@ export function PageClientImpl(props: {
           connectionDetails={connectionDetails}
           userChoices={preJoinChoices}
           options={{ codec: props.codec, hq: props.hq }}
+          hideButtons={props.hideButtons}
         />
       )}
     </main>
@@ -90,6 +94,7 @@ function VideoConferenceComponent(props: {
     hq: boolean;
     codec: VideoCodec;
   };
+  hideButtons?: boolean;
 }) {
   const e2eePassphrase =
     typeof window !== 'undefined' && decodePassphrase(location.hash.substring(1));
@@ -190,6 +195,7 @@ function VideoConferenceComponent(props: {
         onDisconnected={handleOnLeave}
         onEncryptionError={handleEncryptionError}
         onError={handleError}
+        className={props.hideButtons ? styles.hideButtons : undefined}
       >
         <VideoConference
           chatMessageFormatter={formatChatMessageLinks}
@@ -201,3 +207,5 @@ function VideoConferenceComponent(props: {
     </>
   );
 }
+
+

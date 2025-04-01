@@ -12,6 +12,8 @@ export default function Page({
     region?: string;
     hq?: string;
     codec?: string;
+    username?: string;
+    hideButtons?: string;
   };
 }) {
   const codec =
@@ -19,8 +21,19 @@ export default function Page({
       ? searchParams.codec
       : 'vp9';
   const hq = searchParams.hq === 'true' ? true : false;
+  const username = searchParams.username;
+  const hideButtons = searchParams.hideButtons === 'true';
 
   return (
-    <PageClientImpl roomName={params.roomName} region={searchParams.region} hq={hq} codec={codec} />
+    <PageClientImpl 
+      roomName={params.roomName} 
+      region={searchParams.region} 
+      hq={hq} 
+      codec={codec}
+      username={username}
+      hideButtons={hideButtons}
+    />
   );
 }
+
+

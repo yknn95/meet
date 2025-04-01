@@ -1,0 +1,24 @@
+port: 7880
+bind_addresses:
+    - ""
+rtc:
+    tcp_port: 7881
+    port_range_start: 50000
+    port_range_end: 60000
+    use_external_ip: false
+    stun_servers: []
+    enable_loopback_candidate: false
+redis:
+    address: localhost:16579
+    username: ""
+    password: ""
+    db: 0
+    use_tls: false
+    sentinel_master_name: ""
+    sentinel_username: ""
+    sentinel_password: ""
+    sentinel_addresses: []
+    cluster_addresses: []
+    max_redirects: null
+keys:
+    APIAvqvTiLNx889: aPam5auLqJhVYhAsolPMUJoasttXoM1fqQ9Kf6T9u3A
