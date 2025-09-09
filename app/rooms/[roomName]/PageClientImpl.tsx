@@ -17,6 +17,7 @@ import {
   ExternalE2EEKeyProvider,
   RoomOptions,
   VideoCodec,
+  VideoPreset,
   VideoPresets,
   Room,
   DeviceUnsupportedError,
@@ -106,6 +107,7 @@ function VideoConferenceComponent(props: {
   const e2eeEnabled = !!(e2eePassphrase && worker);
   const keyProvider = new ExternalE2EEKeyProvider();
   const [e2eeSetupComplete, setE2eeSetupComplete] = React.useState(false);
+  const _screenSharePreset = new VideoPreset(0, 0, 30_000_000, 30, 'high');
 
   const roomOptions = React.useMemo((): RoomOptions => {
     let videoCodec: VideoCodec | undefined = props.options.codec ? props.options.codec : 'vp9';
@@ -115,15 +117,14 @@ function VideoConferenceComponent(props: {
     return {
       videoCaptureDefaults: {
         deviceId: props.userChoices.videoDeviceId ?? undefined,
-        resolution: props.options.hq ? VideoPresets.h2160 : VideoPresets.h720,
+        resolution: VideoPresets.h1080,
       },
       publishDefaults: {
         dtx: false,
-        videoSimulcastLayers: props.options.hq
-          ? [VideoPresets.h1080, VideoPresets.h720]
-          : [VideoPresets.h540, VideoPresets.h216],
+        videoSimulcastLayers: [VideoPresets.h2160, VideoPresets.h1080],
         red: !e2eeEnabled,
         videoCodec,
+        screenShareEncoding: _screenSharePreset.encoding,
       },
       audioCaptureDefaults: {
         deviceId: props.userChoices.audioDeviceId ?? undefined,
@@ -207,5 +208,4 @@ function VideoConferenceComponent(props: {
     </>
   );
 }
-
 

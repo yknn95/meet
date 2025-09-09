@@ -65,3 +65,8 @@ h2 a {
 h2 a {
   text-decoration: none;
 }
+
+/* 调整侧边栏和主内容区域的比例为1:9 */
+.lk-video-conference .lk-video-conference-inner .lk-focus-layout-wrapper .lk-focus-layout {
+  grid-template-columns: 10% 90% !important;;
+}

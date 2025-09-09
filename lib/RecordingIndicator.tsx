@@ -8,9 +8,9 @@ export function RecordingIndicator() {
   React.useEffect(() => {
     if (isRecording !== wasRecording) {
       setWasRecording(isRecording);
-      if (isRecording) {
-        window.alert('This meeting is being recorded');
-      }
+      //if (isRecording) {
+      //  window.alert('This meeting is being recorded');
+      //}
     }
   }, [isRecording]);
 
