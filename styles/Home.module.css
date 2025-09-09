@@ -38,3 +38,28 @@
   border: 1px solid rgba(255, 255, 255, 0.15);
   border-radius: 0.5rem;
 }
+
+/* 隐藏聊天、离开、全屏和摄像头按钮 */
+.hideButtons :global(.lk-chat-toggle),
+.hideButtons :global(.lk-button-group:has(.lk-button[data-lk-source="camera"])),
+.hideButtons :global(.lk-control-bar) :global(.lk-chat-toggle),
+.hideButtons :global(.lk-control-bar) :global(.lk-button-group:has(.lk-button[data-lk-source="camera"])),
+.hideButtons :global(.lk-prejoin) :global(.lk-button-group:has(.lk-button[data-lk-source="camera"])) {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  position: absolute !important;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  clip: rect(0 0 0 0) !important;
+  -webkit-clip-path: inset(50%) !important;
+  clip-path: inset(50%) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: -1px !important;
+}
+
+
