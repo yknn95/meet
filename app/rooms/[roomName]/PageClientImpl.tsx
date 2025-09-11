@@ -97,78 +97,184 @@ function VideoConferenceComponent(props: {
   };
   hideButtons?: boolean;
 }) {
-  const e2eePassphrase =
-    typeof window !== 'undefined' && decodePassphrase(location.hash.substring(1));
-
-  const worker =
-    typeof window !== 'undefined' &&
-    e2eePassphrase &&
-    new Worker(new URL('livekit-client/e2ee-worker', import.meta.url));
-  const e2eeEnabled = !!(e2eePassphrase && worker);
+  // 完全禁用E2EE加密功能
+  const e2eeEnabled = false;
   const keyProvider = new ExternalE2EEKeyProvider();
-  const [e2eeSetupComplete, setE2eeSetupComplete] = React.useState(false);
-  const _screenSharePreset = new VideoPreset(0, 0, 30_000_000, 30, 'high');
+  const [e2eeSetupComplete, setE2eeSetupComplete] = React.useState(true); // 直接设为true
+  // 屏幕共享强制1080p超高码率配置 - 25Mbps码率，30fps，强制高质量
+  const _screenSharePreset = new VideoPreset(1920, 1080, 25_000_000, 30, 'high');
+  
+  // 创建更高码率的自定义预设 - 30Mbps确保足够的码率余量
+  const _highBitratePreset = new VideoPreset(1920, 1080, 30_000_000, 30, 'high');
 
   const roomOptions = React.useMemo((): RoomOptions => {
-    let videoCodec: VideoCodec | undefined = props.options.codec ? props.options.codec : 'vp9';
-    if (e2eeEnabled && (videoCodec === 'av1' || videoCodec === 'vp9')) {
-      videoCodec = undefined;
-    }
+    // 强制使用H.264编码
+    const videoCodec: VideoCodec = 'h264';
+    
     return {
       videoCaptureDefaults: {
         deviceId: props.userChoices.videoDeviceId ?? undefined,
         resolution: VideoPresets.h1080,
+        // 优化屏幕捕获设置以改善色彩
+        facingMode: undefined,
       },
       publishDefaults: {
         dtx: false,
-        videoSimulcastLayers: [VideoPresets.h2160, VideoPresets.h1080],
-        red: !e2eeEnabled,
+        // 完全禁用simulcast - 这是关键！
+        videoSimulcastLayers: [],
+        red: false, // 关闭冗余编码
         videoCodec,
-        screenShareEncoding: _screenSharePreset.encoding,
+        // 屏幕共享使用超高码率和优化的编码设置
+        screenShareEncoding: {
+          ...(_highBitratePreset.encoding),
+          // 优化H.264编码参数以改善色彩
+          maxBitrate: 30_000_000,
+          maxFramerate: 30,
+        },
+        // 屏幕共享完全禁用simulcast，强制单层超高码率
+        screenShareSimulcastLayers: [],
+        // 强制屏幕共享参数
+        forceStereo: false,
+        // 禁用背景噪声抑制
+        stopMicTrackOnMute: false,
       },
       audioCaptureDefaults: {
         deviceId: props.userChoices.audioDeviceId ?? undefined,
+        // 保持音频处理功能以确保音质
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
       },
-      adaptiveStream: { pixelDensity: 'screen' },
-      dynacast: true,
-      e2ee: e2eeEnabled
-        ? {
-            keyProvider,
-            worker,
-          }
-        : undefined,
+      // 完全关闭自适应流 - 这是防止码率下降的关键
+      adaptiveStream: false,
+      // 关闭动态投播
+      dynacast: false,
+      // 关闭加密
+      e2ee: undefined,
+      // 禁用断线重连时的码率调整
+      disconnectOnPageLeave: true,
     };
   }, [props.userChoices, props.options.hq, props.options.codec]);
 
   const room = React.useMemo(() => new Room(roomOptions), []);
 
+  // 手动配置屏幕共享参数，防止码率被自动调整并优化色彩
   React.useEffect(() => {
-    if (e2eeEnabled) {
-      keyProvider
-        .setKey(decodePassphrase(e2eePassphrase))
-        .then(() => {
-          room.setE2EEEnabled(true).catch((e) => {
-            if (e instanceof DeviceUnsupportedError) {
-              alert(
-                `You're trying to join an encrypted meeting, but your browser does not support it. Please update it to the latest version and try again.`,
-              );
-              console.error(e);
-            } else {
-              throw e;
-            }
-          });
-        })
-        .then(() => setE2eeSetupComplete(true));
-    } else {
-      setE2eeSetupComplete(true);
-    }
-  }, [e2eeEnabled, room, e2eePassphrase]);
+    const handleTrackPublished = (publication: any, participant: any) => {
+      if (publication.source === 'screen_share' && participant.isLocal) {
+        console.log('屏幕共享已开始，应用高码率和色彩优化配置');
+        // 对于本地屏幕共享，确保使用我们预设的高码率配置
+        const track = publication.track;
+        if (track && 'sender' in track) {
+          // 类型断言为LocalVideoTrack
+          const localTrack = track as any;
+          if (localTrack.sender) {
+            localTrack.sender.getParameters().then((params: any) => {
+              if (params.encodings && params.encodings.length > 0) {
+                // 强制设置最高码率和优化编码参数
+                params.encodings[0].maxBitrate = 30_000_000; // 30Mbps
+                params.encodings[0].minBitrate = 20_000_000; // 最低20Mbps
+                params.encodings[0].maxFramerate = 30;
+                // 优化编码质量参数
+                params.encodings[0].priority = 'high';
+                params.encodings[0].networkPriority = 'high';
+                return localTrack.sender.setParameters(params);
+              }
+            }).then(() => {
+              console.log('屏幕共享码率和质量参数设置成功');
+            }).catch(console.error);
+          }
+        }
+      }
+    };
+
+    room.on('trackPublished', handleTrackPublished);
+    
+    return () => {
+      room.off('trackPublished', handleTrackPublished);
+    };
+  }, [room]);
+
+  // 优化屏幕捕获约束以改善色彩质量
+  React.useEffect(() => {
+    // 重写getDisplayMedia以添加色彩优化约束
+    const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia;
+    
+    navigator.mediaDevices.getDisplayMedia = function(constraints: any) {
+      // 优化屏幕捕获约束
+      const optimizedConstraints = {
+        ...constraints,
+        video: {
+          ...constraints?.video,
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
+          frameRate: { ideal: 30, max: 30 },
+          // 优化色彩和质量设置
+          aspectRatio: { ideal: 16/9 },
+          resizeMode: 'none',
+          // 强制高质量捕获
+          displaySurface: 'monitor',
+        }
+      };
+      
+      console.log('使用优化的屏幕捕获约束:', optimizedConstraints);
+      return originalGetDisplayMedia.call(this, optimizedConstraints);
+    };
+
+    return () => {
+      // 恢复原始方法
+      navigator.mediaDevices.getDisplayMedia = originalGetDisplayMedia;
+    };
+  }, []);
+
+  // E2EE功能已完全禁用，无需相关逻辑
 
   const connectOptions = React.useMemo((): RoomConnectOptions => {
     return {
       autoSubscribe: true,
+      // 优化屏幕共享连接选项
+      maxRetries: 3,
+      peerConnectionTimeout: 15000,
+      // 禁用自适应码率调整
+      rtcConfig: {
+        iceTransportPolicy: 'all',
+        bundlePolicy: 'max-bundle',
+      },
     };
   }, []);
+
+  // 添加调试信息，监控码率变化
+  React.useEffect(() => {
+    const handleTrackPublished = (publication: any) => {
+      if (publication.source === 'screen_share') {
+        console.log('屏幕共享轨道已发布:', publication);
+        console.log('编码设置:', publication.track?.sender?.getParameters());
+        
+        // 定期检查码率
+        const checkBitrate = setInterval(() => {
+          if (publication.track?.sender) {
+            publication.track.sender.getStats().then((stats: any) => {
+              stats.forEach((report: any) => {
+                if (report.type === 'outbound-rtp' && report.mediaType === 'video') {
+                  console.log('当前发送码率:', Math.round(report.bytesSent * 8 / 1000), 'kbps');
+                  console.log('目标码率:', report.targetBitrate);
+                }
+              });
+            });
+          }
+        }, 2000);
+
+        // 清理定时器
+        publication.on('unmuted', () => clearInterval(checkBitrate));
+      }
+    };
+
+    room.on('trackPublished', handleTrackPublished);
+    
+    return () => {
+      room.off('trackPublished', handleTrackPublished);
+    };
+  }, [room]);
 
   const router = useRouter();
   const handleOnLeave = React.useCallback(() => router.push('/'), [router]);
@@ -208,4 +314,5 @@ function VideoConferenceComponent(props: {
     </>
   );
 }
+
 
